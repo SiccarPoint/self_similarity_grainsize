@@ -28,6 +28,10 @@ goodpts_B = np.arange(9, dtype=int)
 goodhists = {'B': [], 'T': []}
 goodstds = {'B': [], 'T': []}
 goodmeans = {'B': [], 'T': []}
+goodD50s = {'B': [], 'T': []}
+goodD84s = {'B': [], 'T': []}
+goodlocs = {'B': [], 'T': []}
+goodlocDmean = {'B': [], 'T': []}
 
 for folder_prefix in folders:
     folder = folder_prefix + '_long'
@@ -120,56 +124,67 @@ for folder in folders:
     else:
         goodpts = goodpts_B
     locs = locs_dict[folder]
-    goodlocs = locs[goodpts]
-    goodD50s = np.empty_like(goodlocs, dtype=float)
-    goodD84s = np.empty_like(goodD50s)
+    goodlocs_here = locs[goodpts]
+    goodD50s_here = np.empty_like(goodlocs_here, dtype=float)
+    goodD84s_here = np.empty_like(goodD50s_here)
+    goodmeans_here = np.empty_like(goodD50s_here)
 
     for loc in goodpts:
         D50s = []
         D84s = []
         stds = []
+        means = []
         for sample in data_dict[folder][loc+1].values():
             D50s.append(np.percentile(sample, 50.))
             D84s.append(np.percentile(sample, 84.))
             stds.append(sample.std())
+            means.append(sample.mean())
         sample_D50 = np.mean(D50s)
         sample_D84 = np.mean(D84s)
         sample_std = np.mean(stds)
-        goodD50s[loc] = sample_D50
-        goodD84s[loc] = sample_D84
+        sample_mean = np.mean(means)
+        goodD50s_here[loc] = sample_D50
+        goodD84s_here[loc] = sample_D84
+        goodmeans_here[loc] = sample_mean
     # plt.figure('mean_GS_' + folder + '_dstr_topsets')
-    plt.plot(goodlocs, goodD50s)
-    plt.plot(goodlocs, goodD84s)
+    plt.plot(goodlocs_here, goodD50s_here)
+    plt.plot(goodlocs_here, goodD84s_here)
     plt.ylim(ymin=0.)
+    goodD50s[folder] = goodD50s_here
+    goodD84s[folder] = goodD84s_here
+    goodlocs[folder] = goodlocs_here
+    goodlocDmean[folder] = goodmeans_here
     # do some curve fitting:
-    datarange = np.arange(goodlocs[-1], goodlocs[0], 100.)
+    datarange = np.arange(goodlocs_here[-1], goodlocs_here[0], 100.)
     if fit_equ == 'exp':
-        (a, b), _ = curve_fit(equ_form, goodlocs, goodD50s, p0=(1., 1.))
+        (a, b), _ = curve_fit(equ_form, goodlocs_here, goodD50s_here,
+                              p0=(1., 1.))
         sim_data = equ_form(datarange, a, b)
         params_dict[folder]['D50'] = (a, b)
     else:
-        (a, b, c), _ = curve_fit(equ_form, goodlocs, goodD50s,
+        (a, b, c), _ = curve_fit(equ_form, goodlocs_here, goodD50s_here,
                                  p0=(1., -100., 1.))
         sim_data = equ_form(datarange, a, b, c)
         params_dict[folder]['D50'] = (a, b, c)
     plt.plot(datarange, sim_data)
     if fit_equ == 'exp':
         try:
-            (a, b), _ = curve_fit(equ_form, goodlocs, goodD84s, p0=(1., 1.))
+            (a, b), _ = curve_fit(equ_form, goodlocs_here, goodD84s_here,
+                                  p0=(1., 1.))
             sim_data = equ_form(datarange, a, b)
             params_dict[folder]['D84'] = (a, b)
         except RuntimeError:
-            p = np.polyfit(goodlocs, goodD84s, 1)
+            p = np.polyfit(goodlocs_here, goodD84s_here, 1)
             sim_data = np.poly1d(p)(datarange)
             params_dict[folder]['D84'] = p
     else:
         try:
-            (a, b, c), _ = curve_fit(equ_form, goodlocs, goodD84s,
+            (a, b, c), _ = curve_fit(equ_form, goodlocs_here, goodD84s_here,
                                      p0=(1., -100., 1.))
             sim_data = equ_form(datarange, a, b, c)
             params_dict[folder]['D84'] = (a, b, c)
         except RuntimeError:
-            p = np.polyfit(goodlocs, goodD84s, 1)
+            p = np.polyfit(goodlocs_here, goodD84s_here, 1)
             sim_data = np.poly1d(p)(datarange)
             params_dict[folder]['D84'] = p
     plt.plot(datarange, sim_data)
@@ -287,39 +302,87 @@ plt.plot(Cv_B)
 plt.ylim([0., 1.2])
 Cv_mean = (Cv_T.sum() + Cv_B.sum())/(Cv_T.size + Cv_B.size)
 
-# Now we can proceed with the fit, again following Mitch
-# retain Mitch's (8) & (10) (geometric fan spread is logarithmic); but (9) for
-# a delta probably should be r*(x*) = r0, i.e., a const, & not a fn(x*).
-# For (10), we measure W, W0 ~ 1000m, Wapex = 1800m. Need a bunch more transect
-# measurements to do this properly, but for now just assume W = 1500m.
-# Gobo indicates L_T ~ 2450m, L_B ~ 1650m.
-# These two simplifications make everything super easy, and (8) becomes:
-# Qs(x*) = Qs0 - (1-porosity)*r0*W0* x*
-# And (7) is
-# R*(x*) = (1-porosity)*L*r0*W0/Qs(x*)
-# R*(x*) = ((1-porosity)*L*r0*W0 /
-#           (Qs0 - (1-porosity)*r0*W0* x*))
-# i.e.
-# R*(x*) ~ K1 / (1 - K2 * x*)
-# And: K1 = (1-porosity)*L*r0*W0*Qs0;
-#      K2 = (1-porosity)*r0*W0/Qs0 = K1/(L*Qs0**2)
-# NOTE: by including L here, I think there's an assumption about sed exhaustion
-# so our equ's may need tweaking. Think this will be OK, since it remains
-# geometrically controlled. ...NO, if equ's are set right, exhaustion or export
-# happen correctly.
+# See notebook 100-134 for long profile GS fitting rationale
+# Our simplest form capable of fitting convext GS profiles involves invoking
+# fan spread, and yields in its fullest form:
+# D(x) = D0 + std0*C2/C1*((1 + (1-P)*r0*w0*L*x/(2*Qs0)*(2+pi*L/w0*x))**-C1 - 1)
+# let's try to fit this
 
-# Our expression to fit GS comes from (4) & (5). (4) is easy:
-# y*(x*) = integral(R*(x*) dx*), 0 to x*. This has a nice analytic solution for
-# our R*,
-# y*(x*) = -K1*log(1-K2* x*) /K2
 
-# So using our best guess values (r0 ~ 0.001 m/y?):
-#     K1_T ~ 2450 * Qs0
-#     K2_T ~ 1. / Qs0
-#     K1_T/K2_T = 2450. * Qs0**2
-# Now D depends in large part on the value of exp(y*), which we can simplify:
-# exp(y*) = (1 - k2* x*)**(-K1/K2), which unfortunately is explosive at large K
+def calc_GS(x, D0, Qs0, C1):
+    # we will force:
+    # std0, D0, r0 = 0.001 (?), w0 = 130, L = 2450, P, C_v
+    r0 = 0.01
+    w0 = 130.
+    L = 2450.
+    std0 = 31.  # approx for top
+    # std0 = 41.  # approx for bottom
+    D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
+         (2. + np.pi * L / w0 * x))**-C1 - 1.))
+    return D
 
+def calc_GSC1(x, D0, Qs0):
+    # we will force:
+    # std0, D0, r0 = 0.001 (?), w0 = 130, L = 2450, P, C_v
+    r0 = 0.01
+    w0 = 130.
+    L = 2450.
+    C1 = 2.3
+    std0 = 31.  # approx for top
+    # std0 = 41.  # approx for bottom
+    D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
+         (2. + np.pi * L / w0 * x))**-C1 - 1.))
+    return D
+
+
+def calc_GSD(x, C1, Qs0):
+    r0 = 0.01
+    w0 = 130.
+    L = 2450.
+    D0 = 53.  # for B
+    # std0 = 31.  # approx for top
+    std0 = 41.  # approx for bottom
+    D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
+         (2. + np.pi * L / w0 * x))**-C1 - 1.))
+    return D
+
+
+def calc_GSQ(x, Qs0):
+    r0 = 0.01
+    w0 = 130.
+    L = 2450.
+    C1 = 2.3
+    D0 = 53.  # for B
+    # std0 = 31.  # approx for top
+    std0 = 41.  # approx for bottom
+    D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
+         (2. + np.pi * L / w0 * x))**-C1 - 1.))
+    return D
+
+# do the brute force fit
+distsT = goodlocs['T'].max() - goodlocs['T']
+distsB = goodlocs['B'].max() - goodlocs['B']
+GS_best_T, GS_covar_T = curve_fit(calc_GS, distsT, goodlocDmean['T'],
+                                  p0=(60., 1000000., 0.7))
+GS_best_TC1, GS_covar_TC1 = curve_fit(calc_GSC1, distsT, goodlocDmean['T'],
+                                      p0=(60., 1000000.))
+GS_best_B, GS_covar_B = curve_fit(calc_GS, distsB, goodlocDmean['B'],
+                                  p0=(60., 1000000., 0.7))
+GS_best_BC1, GS_covar_BC1 = curve_fit(calc_GSC1, distsB, goodlocDmean['B'],
+                                      p0=(60., 1000000.))
+GS_best_BD, GS_covar_BD = curve_fit(calc_GSD, distsB, goodlocDmean['B'],
+                                    p0=(1., 1000000.))
+GS_best_BQ, GS_covar_BQ = curve_fit(calc_GSQ, distsB, goodlocDmean['B'],
+                                    p0=(1000000.))
+plt.figure('GS_fit')
+plt.plot(distsT, goodlocDmean['T'], 'x')
+plt.plot(distsT, calc_GS(distsT, GS_best_T[0], GS_best_T[1], GS_best_T[2]))
+plt.plot(distsT, calc_GSC1(distsT, GS_best_TC1[0], GS_best_TC1[1]))
+plt.plot(distsB, goodlocDmean['B'], 'o')
+plt.plot(distsB, calc_GS(distsB, GS_best_B[0], GS_best_B[1], GS_best_B[2]))
+plt.plot(distsB, calc_GSC1(distsB, GS_best_BC1[0], GS_best_BC1[1]))
+plt.plot(distsB, calc_GSD(distsB, GS_best_BD[0], GS_best_BD[1]))
+plt.plot(distsB, calc_GSQ(distsB, GS_best_BQ[0]))
 
 plt.figure('all_GS_dists')
 # plt.plot(xi, f)
