@@ -312,19 +312,20 @@ Cv_mean = (Cv_T.sum() + Cv_B.sum())/(Cv_T.size + Cv_B.size)
 def calc_GS(x, D0, Qs0, C1):
     # we will force:
     # std0, D0, r0 = 0.001 (?), w0 = 130, L = 2450, P, C_v
-    r0 = 0.01
+    r0 = 0.001
     w0 = 130.
     L = 2450.
-    std0 = 31.  # approx for top
-    # std0 = 41.  # approx for bottom
+    # std0 = 31.  # approx for top
+    std0 = 41.  # approx for bottom
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
          (2. + np.pi * L / w0 * x))**-C1 - 1.))
     return D
 
-def calc_GSC1(x, D0, Qs0):
+
+def calc_GSC1T(x, D0, Qs0):
     # we will force:
     # std0, D0, r0 = 0.001 (?), w0 = 130, L = 2450, P, C_v
-    r0 = 0.01
+    r0 = 0.001
     w0 = 130.
     L = 2450.
     C1 = 2.3
@@ -335,8 +336,22 @@ def calc_GSC1(x, D0, Qs0):
     return D
 
 
+def calc_GSC1B(x, D0, Qs0):
+    # we will force:
+    # std0, D0, r0 = 0.001 (?), w0 = 130, L = 2450, P, C_v
+    r0 = 0.001
+    w0 = 130.
+    L = 2450.
+    C1 = 2.3
+    # std0 = 31.  # approx for top
+    std0 = 41.  # approx for bottom
+    D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
+         (2. + np.pi * L / w0 * x))**-C1 - 1.))
+    return D
+
+
 def calc_GSD(x, C1, Qs0):
-    r0 = 0.01
+    r0 = 0.001
     w0 = 130.
     L = 2450.
     D0 = 53.  # for B
@@ -347,12 +362,24 @@ def calc_GSD(x, C1, Qs0):
     return D
 
 
-def calc_GSQ(x, Qs0):
-    r0 = 0.01
+def calc_GSQT(x, Qs0):
+    r0 = 0.001
     w0 = 130.
     L = 2450.
     C1 = 2.3
-    D0 = 53.  # for B
+    D0 = 42.  # for T
+    std0 = 31.  # approx for top
+    D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
+         (2. + np.pi * L / w0 * x))**-C1 - 1.))
+    return D
+
+
+def calc_GSQB(x, Qs0):
+    r0 = 0.001
+    w0 = 130.
+    L = 2450.
+    C1 = 2.3
+    D0 = 46.  # for B
     # std0 = 31.  # approx for top
     std0 = 41.  # approx for bottom
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
@@ -364,30 +391,45 @@ distsT = goodlocs['T'].max() - goodlocs['T']
 distsB = goodlocs['B'].max() - goodlocs['B']
 GS_best_T, GS_covar_T = curve_fit(calc_GS, distsT, goodlocDmean['T'],
                                   p0=(60., 1000000., 0.7))
-GS_best_TC1, GS_covar_TC1 = curve_fit(calc_GSC1, distsT, goodlocDmean['T'],
-                                      p0=(60., 1000000.))
+GS_best_TC1, GS_covar_TC1 = curve_fit(calc_GSC1T, distsT, goodlocDmean['T'],
+                                      p0=(60., 1000000.))  # NB: a TON of covariance betw D0 and Qs0 here
+GS_best_TQ, GS_covar_TQ = curve_fit(calc_GSQT, distsT, goodlocDmean['T'],
+                                    p0=(1.e14))
 GS_best_B, GS_covar_B = curve_fit(calc_GS, distsB, goodlocDmean['B'],
                                   p0=(60., 1000000., 0.7))
-GS_best_BC1, GS_covar_BC1 = curve_fit(calc_GSC1, distsB, goodlocDmean['B'],
+GS_best_BC1, GS_covar_BC1 = curve_fit(calc_GSC1B, distsB, goodlocDmean['B'],
                                       p0=(60., 1000000.))
 GS_best_BD, GS_covar_BD = curve_fit(calc_GSD, distsB, goodlocDmean['B'],
                                     p0=(1., 1000000.))
-GS_best_BQ, GS_covar_BQ = curve_fit(calc_GSQ, distsB, goodlocDmean['B'],
-                                    p0=(1000000.))
+GS_best_BQ, GS_covar_BQ = curve_fit(calc_GSQB, distsB, goodlocDmean['B'],
+                                    p0=(1.e14))
 plt.figure('GS_fit')
 plt.plot(distsT, goodlocDmean['T'], 'x')
 plt.plot(distsT, calc_GS(distsT, GS_best_T[0], GS_best_T[1], GS_best_T[2]))
-plt.plot(distsT, calc_GSC1(distsT, GS_best_TC1[0], GS_best_TC1[1]))
+plt.plot(distsT, calc_GSC1T(distsT, GS_best_TC1[0], GS_best_TC1[1]))
+plt.plot(distsT, calc_GSQT(distsT, GS_best_TQ[0]), 'k')
 plt.plot(distsB, goodlocDmean['B'], 'o')
 plt.plot(distsB, calc_GS(distsB, GS_best_B[0], GS_best_B[1], GS_best_B[2]))
-plt.plot(distsB, calc_GSC1(distsB, GS_best_BC1[0], GS_best_BC1[1]))
+plt.plot(distsB, calc_GSC1B(distsB, GS_best_BC1[0], GS_best_BC1[1]))
 plt.plot(distsB, calc_GSD(distsB, GS_best_BD[0], GS_best_BD[1]))
-plt.plot(distsB, calc_GSQ(distsB, GS_best_BQ[0]))
+plt.plot(distsB, calc_GSQB(distsB, GS_best_BQ[0]), 'k')
 
 plt.figure('all_GS_dists')
 # plt.plot(xi, f)
 plt.plot(binmeans, calc_curve(binmeans, best_vals[0], best_vals[1], best_vals[2]))
 plt.xlim((xmin, xmax))
+
+plt.figure('GS_model_fit_options_B')
+Qs_options_B = (np.arange(6)+3.)*1.e10
+plt.plot(distsB, goodlocDmean['B'], 'o')
+for Qs in Qs_options_B:
+    plt.plot(distsB, calc_GSC1B(distsB, 46., Qs))
+
+plt.figure('GS_model_fit_options_T')
+Qs_options_T = Qs_options_B * 3.
+plt.plot(distsT, goodlocDmean['T'], 'o')
+for Qs in Qs_options_T:
+    plt.plot(distsT, calc_GSC1T(distsT, 45., Qs))
 
 plt.show()
 # Note that (by definition?) the D50s at each level converge at infinite
