@@ -392,8 +392,8 @@ def calc_GSQB(x, Qs0):
 
 
 # do the brute force fit
-distsT = goodlocs['T'].max() - goodlocs['T']
-distsB = goodlocs['B'].max() - goodlocs['B']
+distsT = (goodlocs['T'].max() - goodlocs['T'])/goodlocs['B'].max()
+distsB = (goodlocs['B'].max() - goodlocs['B'])/goodlocs['B'].max()
 GS_best_T, GS_covar_T = curve_fit(calc_GS, distsT, goodlocDmean['T'],
                                   p0=(0.6, 1000000., 0.7))
 GS_best_TC1, GS_covar_TC1 = curve_fit(calc_GSC1T, distsT, goodlocDmean['T'],
@@ -409,14 +409,14 @@ GS_best_BD, GS_covar_BD = curve_fit(calc_GSD, distsB, goodlocDmean['B'],
 GS_best_BQ, GS_covar_BQ = curve_fit(calc_GSQB, distsB, goodlocDmean['B'],
                                     p0=(1.e6))
 plt.figure('GS_fit')
-dists_forplot = np.arange(0., 2700., 100.)
+dists_forplot = np.arange(0., 1., 0.05)
 plt.plot(distsT, goodlocDmean['T'], 'x')
 plt.plot(dists_forplot, calc_GS(dists_forplot, GS_best_T[0], GS_best_T[1], GS_best_T[2]))
-plt.plot(dists_forplot, calc_GSC1T(dists_forplot, GS_best_TC1[0], GS_best_TC1[1]))
+plt.plot(dists_forplot, calc_GSC1T(dists_forplot, GS_best_TC1[0], GS_best_TC1[1]), 'r')
 plt.plot(dists_forplot, calc_GSQT(dists_forplot, GS_best_TQ[0]), 'k')
 plt.plot(distsB, goodlocDmean['B'], 'o')
 plt.plot(dists_forplot, calc_GS(dists_forplot, GS_best_B[0], GS_best_B[1], GS_best_B[2]))
-plt.plot(dists_forplot, calc_GSC1B(dists_forplot, GS_best_BC1[0], GS_best_BC1[1]))
+plt.plot(dists_forplot, calc_GSC1B(dists_forplot, GS_best_BC1[0], GS_best_BC1[1]), 'r')
 plt.plot(dists_forplot, calc_GSD(dists_forplot, GS_best_BD[0], GS_best_BD[1]))
 plt.plot(dists_forplot, calc_GSQB(dists_forplot, GS_best_BQ[0]), 'k')  # this gives whole graph's worth of data
 
@@ -425,17 +425,17 @@ plt.figure('all_GS_dists')
 plt.plot(binmeans, calc_curve(binmeans, best_vals[0], best_vals[1], best_vals[2]))
 plt.xlim((xmin, xmax))
 
-plt.figure('GS_model_fit_options_B')
-Qs_options_B = (np.arange(6)+3.)*1.e10
-plt.plot(distsB, goodlocDmean['B'], 'o')
-for Qs in Qs_options_B:
-    plt.plot(dists_forplot, calc_GSC1B(dists_forplot, 0.46, Qs))
-
-plt.figure('GS_model_fit_options_T')
-Qs_options_T = Qs_options_B * 3.
-plt.plot(distsT, goodlocDmean['T'], 'o')
-for Qs in Qs_options_T:
-    plt.plot(dists_forplot, calc_GSC1T(dists_forplot, 0.42, Qs))
+# plt.figure('GS_model_fit_options_B')
+# Qs_options_B = (np.arange(6)+3.)*1.e10
+# plt.plot(distsB, goodlocDmean['B'], 'o')
+# for Qs in Qs_options_B:
+#     plt.plot(dists_forplot, calc_GSC1B(dists_forplot, 0.46, Qs))
+#
+# plt.figure('GS_model_fit_options_T')
+# Qs_options_T = Qs_options_B * 3.
+# plt.plot(distsT, goodlocDmean['T'], 'o')
+# for Qs in Qs_options_T:
+#     plt.plot(dists_forplot, calc_GSC1T(dists_forplot, 0.42, Qs))
 
 plt.show()
 # Note that (by definition?) the D50s at each level converge at infinite
