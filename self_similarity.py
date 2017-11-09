@@ -50,7 +50,7 @@ for folder_prefix in folders:
             x = [int(i[0]) for i in reader]
 
             data = np.array(x)
-            data = data.astype(float)/100.  # go to m, not cm
+            data = data.astype(float)/1000.  # go to m, not cm
 
             # now save the data for the future:
             run = int(filename[:2])
@@ -320,8 +320,8 @@ def calc_GS(x, D0, Qs0, C1):
     r0 = 0.001
     w0 = 130.
     L = 2450.
-    # std0 = 0.223  # approx for top
-    std0 = 0.279  # approx for bottom
+    # std0 = 0.0223  # approx for top
+    std0 = 0.0279  # approx for bottom
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
          (2. + np.pi * L / w0 * x))**-C1 - 1.))
     return D
@@ -334,8 +334,8 @@ def calc_GSC1T(x, D0, Qs0):
     w0 = 130.
     L = 2450.
     C1 = 2.13
-    std0 = 0.223  # approx for top
-    # std0 = 0.279  # approx for bottom
+    std0 = 0.0223  # approx for top
+    # std0 = 0.0279  # approx for bottom
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
          (2. + np.pi * L / w0 * x))**-C1 - 1.))
     return D
@@ -348,8 +348,8 @@ def calc_GSC1B(x, D0, Qs0):
     w0 = 130.
     L = 2450.
     C1 = 2.13
-    # std0 = 0.223  # approx for top
-    std0 = 0.279  # approx for bottom
+    # std0 = 0.0223  # approx for top
+    std0 = 0.0279  # approx for bottom
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
          (2. + np.pi * L / w0 * x))**-C1 - 1.))
     return D
@@ -360,8 +360,8 @@ def calc_GSD(x, C1, Qs0):
     w0 = 130.
     L = 2450.
     D0 = 0.53  # for B
-    # std0 = 0.223  # approx for top
-    std0 = 0.279  # approx for bottom
+    # std0 = 0.0223  # approx for top
+    std0 = 0.0279  # approx for bottom
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
          (2. + np.pi * L / w0 * x))**-C1 - 1.))
     return D
@@ -372,8 +372,8 @@ def calc_GSQT(x, Qs0):
     w0 = 130.  # 130.
     L = 2450.  # 2450.
     C1 = 2.13  # 2.13
-    D0 = 0.42  # 0.42 for T
-    std0 = 0.223  # approx for top
+    D0 = 0.040  # 0.040 - 0.042
+    std0 = 0.0223  # approx for top
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
          (2. + np.pi * L / w0 * x))**-C1 - 1.))
     return D
@@ -384,16 +384,19 @@ def calc_GSQB(x, Qs0):
     w0 = 130.  # 130.
     L = 2450.  # 2450.
     C1 = 2.13  # 2.13
-    D0 = 0.46  # 0.46
-    std0 = 0.279  # approx for bottom
+    D0 = 0.049  # 0.045 - 0.049
+    std0 = 0.0279  # approx for bottom
     D = (D0 + std0/C_v * ((1. + (1.-porosity) * r0 * w0 * L * x / (2. * Qs0) *
          (2. + np.pi * L / w0 * x))**-C1 - 1.))
     return D
 
+offset_dist = 0.  # how far did we miss the ch head by?
 
 # do the brute force fit
-distsT = (goodlocs['T'].max() - goodlocs['T'])/goodlocs['B'].max()
-distsB = (goodlocs['B'].max() - goodlocs['B'])/goodlocs['B'].max()
+syshead = max((goodlocs['T'].max(), goodlocs['B'].max())) + offset_dist
+syslen = syshead - min((goodlocs['T'].min(), goodlocs['B'].min()))
+distsT = (syshead - goodlocs['T'])/syslen
+distsB = (syshead - goodlocs['B'])/syslen
 GS_best_T, GS_covar_T = curve_fit(calc_GS, distsT, goodlocDmean['T'],
                                   p0=(0.6, 1000000., 0.7))
 GS_best_TC1, GS_covar_TC1 = curve_fit(calc_GSC1T, distsT, goodlocDmean['T'],
@@ -409,21 +412,25 @@ GS_best_BD, GS_covar_BD = curve_fit(calc_GSD, distsB, goodlocDmean['B'],
 GS_best_BQ, GS_covar_BQ = curve_fit(calc_GSQB, distsB, goodlocDmean['B'],
                                     p0=(1.e6))
 plt.figure('GS_fit')
-dists_forplot = np.arange(0., 1., 0.05)
-plt.plot(distsT, goodlocDmean['T'], 'x')
-plt.plot(dists_forplot, calc_GS(dists_forplot, GS_best_T[0], GS_best_T[1], GS_best_T[2]))
-plt.plot(dists_forplot, calc_GSC1T(dists_forplot, GS_best_TC1[0], GS_best_TC1[1]), 'r')
+dists_forplot = np.arange(0., 1.05, 0.05)
+plt.plot(distsT, goodlocDmean['T'], 'ko')
+#plt.plot(dists_forplot, calc_GS(dists_forplot, GS_best_T[0], GS_best_T[1], GS_best_T[2]))
+##plt.plot(dists_forplot, calc_GSC1T(dists_forplot, GS_best_TC1[0], GS_best_TC1[1]), 'r')
 plt.plot(dists_forplot, calc_GSQT(dists_forplot, GS_best_TQ[0]), 'k')
-plt.plot(distsB, goodlocDmean['B'], 'o')
-plt.plot(dists_forplot, calc_GS(dists_forplot, GS_best_B[0], GS_best_B[1], GS_best_B[2]))
-plt.plot(dists_forplot, calc_GSC1B(dists_forplot, GS_best_BC1[0], GS_best_BC1[1]), 'r')
-plt.plot(dists_forplot, calc_GSD(dists_forplot, GS_best_BD[0], GS_best_BD[1]))
-plt.plot(dists_forplot, calc_GSQB(dists_forplot, GS_best_BQ[0]), 'k')  # this gives whole graph's worth of data
+plt.plot(distsB, goodlocDmean['B'], 'bx')
+#plt.plot(dists_forplot, calc_GS(dists_forplot, GS_best_B[0], GS_best_B[1], GS_best_B[2]))
+##plt.plot(dists_forplot, calc_GSC1B(dists_forplot, GS_best_BC1[0], GS_best_BC1[1]), 'r')
+#plt.plot(dists_forplot, calc_GSD(dists_forplot, GS_best_BD[0], GS_best_BD[1]))
+plt.plot(dists_forplot, calc_GSQB(dists_forplot, GS_best_BQ[0]), '--b')  # this gives whole graph's worth of data
+plt.xlabel('Normalized distance downstream')
+plt.ylabel('Mean grain size (m)')
 
 plt.figure('all_GS_dists')
 # plt.plot(xi, f)
 plt.plot(binmeans, calc_curve(binmeans, best_vals[0], best_vals[1], best_vals[2]))
 plt.xlim((xmin, xmax))
+plt.xlabel('Similarity variable')
+plt.ylabel('Probability density')
 
 # plt.figure('GS_model_fit_options_B')
 # Qs_options_B = (np.arange(6)+3.)*1.e10
@@ -437,6 +444,6 @@ plt.xlim((xmin, xmax))
 # for Qs in Qs_options_T:
 #     plt.plot(dists_forplot, calc_GSC1T(dists_forplot, 0.42, Qs))
 
-plt.show()
+#plt.show()
 # Note that (by definition?) the D50s at each level converge at infinite
 # distance. The D84s very much do not!
